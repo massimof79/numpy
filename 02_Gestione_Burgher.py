@@ -38,6 +38,16 @@ MENU = {
 # Punti vendita
 FILIALI = ["Centro", "Nord", "Sud", "Est"]
 
+# Lista per memorizzare gli ordini della giornata corrente
+ordini_giornata = []
+
+# Categorie prodotti per analisi
+CATEGORIE = {
+    "Hamburger": [1, 2, 3, 4, 5],
+    "Contorni": [6, 7],
+    "Bevande": [8, 9, 10]
+}
+
 # Dati simulati settimana scorsa: 
 # Shape: (7 giorni, 4 filiali, 10 prodotti) = quantità vendute
 np.random.seed(123)
@@ -125,6 +135,7 @@ def registra_ordine():
     ordine = []
     totale = 0
     calorie_totali = 0
+    tempo_totale = 0
     
     # TODO 2.1: Implementa il ciclo per prendere ordini
     # Il cliente può ordinare più prodotti fino a quando digita 0
@@ -149,9 +160,10 @@ def registra_ordine():
             
             # TODO 2.4: Aggiungi all'ordine e calcola totali
             nome, prezzo, calorie, tempo = MENU[scelta]
-            ordine.append([scelta, nome, quantita, prezzo * quantita])
+            ordine.append([scelta, nome, quantita, prezzo * quantita, calorie * quantita, tempo])
             totale += prezzo * quantita
             calorie_totali += calorie * quantita
+            tempo_totale = max(tempo_totale, tempo)  # Tempo massimo (preparazione parallela)
             
             print(f"✓ Aggiunto: {quantita}x {nome} = €{prezzo * quantita:.2f}")
             
@@ -164,17 +176,211 @@ def registra_ordine():
         print("🧾 SCONTRINO")
         print("="*70)
         for item in ordine:
-            id_prod, nome, qta, subtot = item
+            id_prod, nome, qta, subtot, cal, tmp = item
             print(f"{qta}x {nome:<30} €{subtot:>8.2f}")
         print("─"*70)
         print(f"{'TOTALE':<35} €{totale:>8.2f}")
         print(f"{'CALORIE TOTALI':<35} {calorie_totali:>8} kcal")
+        print(f"{'TEMPO PREPARAZIONE STIMATO':<35} {tempo_totale:>8} min")
         print("="*70)
+        
+        # Salva l'ordine nella lista globale
+        ordini_giornata.append({
+            'ordine': ordine,
+            'totale': totale,
+            'calorie': calorie_totali,
+            'tempo': tempo_totale
+        })
+        
+        # Mostra il resoconto dettagliato
+        resoconto_ordine(ordine, totale, calorie_totali)
         
         return ordine, totale, calorie_totali
     else:
         print("\n⚠️  Ordine vuoto!")
         return None, 0, 0
+
+def resoconto_ordine(ordine, totale, calorie_totali):
+    """Genera un resoconto dettagliato dell'ordine appena inserito"""
+    print("\n" + "="*70)
+    print("📊 RESOCONTO DETTAGLIATO ORDINE")
+    print("="*70)
+    
+    # TODO 2.6: Analisi per categoria
+    print("\n🏷️  ANALISI PER CATEGORIA:")
+    print("─"*70)
+    
+    categoria_stats = {cat: {'quantita': 0, 'spesa': 0} for cat in CATEGORIE}
+    
+    for item in ordine:
+        id_prod, nome, qta, subtot, cal, tmp = item
+        # Trova la categoria del prodotto
+        for categoria, prodotti_ids in CATEGORIE.items():
+            if id_prod in prodotti_ids:
+                categoria_stats[categoria]['quantita'] += qta
+                categoria_stats[categoria]['spesa'] += subtot
+                break
+    
+    for categoria, stats in categoria_stats.items():
+        if stats['quantita'] > 0:
+            print(f"{categoria:15} {stats['quantita']:3} prodotti  €{stats['spesa']:7.2f}")
+    
+    # TODO 2.7: Confronto con media storica
+    print("\n📈 CONFRONTO CON SETTIMANA SCORSA:")
+    print("─"*70)
+    
+    # Calcola la media di spesa per ordine dalla settimana scorsa
+    vendite_per_prodotto = np.sum(vendite_settimana, axis=(0, 1))
+    incasso_settimana = 0
+    for i in range(10):
+        prezzo = MENU[i + 1][1]
+        quantita = vendite_per_prodotto[i]
+        incasso_settimana += prezzo * quantita
+    
+    # Stima numero ordini (assumendo 3 prodotti per ordine in media)
+    num_ordini_stimati = np.sum(vendite_settimana) / 3
+    spesa_media_storica = incasso_settimana / num_ordini_stimati
+    
+    differenza_percentuale = ((totale - spesa_media_storica) / spesa_media_storica) * 100
+    
+    print(f"Spesa media storica per ordine: €{spesa_media_storica:.2f}")
+    print(f"Questo ordine:                  €{totale:.2f}")
+    
+    if differenza_percentuale > 0:
+        print(f"⬆️  Questo ordine è il {differenza_percentuale:.1f}% SUPERIORE alla media")
+    else:
+        print(f"⬇️  Questo ordine è il {abs(differenza_percentuale):.1f}% INFERIORE alla media")
+    
+    # TODO 2.8: Indicatori salute
+    print("\n💚 INDICATORI SALUTE:")
+    print("─"*70)
+    
+    if calorie_totali < 600:
+        livello = "🟢 BASSO"
+    elif calorie_totali < 1000:
+        livello = "🟡 MEDIO"
+    else:
+        livello = "🔴 ALTO"
+    
+    print(f"Apporto calorico: {calorie_totali} kcal - Livello {livello}")
+    
+    # Calcola percentuale fabbisogno giornaliero (2000 kcal riferimento)
+    percentuale_fabbisogno = (calorie_totali / 2000) * 100
+    print(f"Percentuale fabbisogno giornaliero: {percentuale_fabbisogno:.1f}%")
+    
+    # TODO 2.9: Suggerimenti personalizzati
+    print("\n💡 SUGGERIMENTI:")
+    print("─"*70)
+    
+    ha_hamburger = any(item[0] in CATEGORIE["Hamburger"] for item in ordine)
+    ha_bevanda = any(item[0] in CATEGORIE["Bevande"] for item in ordine)
+    ha_contorno = any(item[0] in CATEGORIE["Contorni"] for item in ordine)
+    
+    if ha_hamburger and not ha_bevanda:
+        print("• Che ne dici di una bevanda per completare il pasto?")
+    if ha_hamburger and not ha_contorno:
+        print("• Le nostre patatine accompagnano perfettamente gli hamburger!")
+    if totale < 10:
+        print("• Con soli €", f"{(10 - totale):.2f}", "in più potresti avere il Menu del Giorno!")
+    if calorie_totali > 1200:
+        print("• Ordine molto calorico! Considera le nostre opzioni più leggere.")
+    
+    print("="*70)
+
+def analisi_ordini_giornata():
+    """Analizza tutti gli ordini inseriti manualmente nella giornata corrente"""
+    if not ordini_giornata:
+        print("\n⚠️  Nessun ordine registrato oggi!")
+        return
+    
+    print("\n" + "="*70)
+    print("📋 RESOCONTO ORDINI GIORNATA CORRENTE")
+    print("="*70)
+    
+    # TODO 2.10: Statistiche generali
+    print(f"\n📊 STATISTICHE GENERALI:")
+    print("─"*70)
+    print(f"Numero ordini registrati: {len(ordini_giornata)}")
+    
+    totale_incassi = sum(ord['totale'] for ord in ordini_giornata)
+    totale_calorie = sum(ord['calorie'] for ord in ordini_giornata)
+    tempo_medio = np.mean([ord['tempo'] for ord in ordini_giornata])
+    
+    print(f"Incasso totale:           €{totale_incassi:.2f}")
+    print(f"Incasso medio per ordine: €{totale_incassi/len(ordini_giornata):.2f}")
+    print(f"Calorie totali servite:   {totale_calorie:,} kcal")
+    print(f"Tempo medio preparazione: {tempo_medio:.1f} min")
+    
+    # TODO 2.11: Prodotti più ordinati oggi
+    print(f"\n🏆 PRODOTTI PIÙ ORDINATI OGGI:")
+    print("─"*70)
+    
+    # Conta i prodotti
+    conteggio_prodotti = {}
+    for ord_data in ordini_giornata:
+        for item in ord_data['ordine']:
+            id_prod = item[0]
+            qta = item[2]
+            if id_prod not in conteggio_prodotti:
+                conteggio_prodotti[id_prod] = 0
+            conteggio_prodotti[id_prod] += qta
+    
+    # Ordina per quantità
+    prodotti_ordinati = sorted(conteggio_prodotti.items(), key=lambda x: x[1], reverse=True)
+    
+    for i, (id_prod, qta) in enumerate(prodotti_ordinati[:5], 1):
+        nome = MENU[id_prod][0]
+        print(f"{i}. {nome:<25} {qta} unità")
+    
+    # TODO 2.12: Distribuzione per fascia di prezzo
+    print(f"\n💰 DISTRIBUZIONE ORDINI PER FASCIA DI PREZZO:")
+    print("─"*70)
+    
+    fasce = {
+        "Economico (< €10)": 0,
+        "Medio (€10-€20)": 0,
+        "Alto (> €20)": 0
+    }
+    
+    for ord in ordini_giornata:
+        if ord['totale'] < 10:
+            fasce["Economico (< €10)"] += 1
+        elif ord['totale'] <= 20:
+            fasce["Medio (€10-€20)"] += 1
+        else:
+            fasce["Alto (> €20)"] += 1
+    
+    for fascia, count in fasce.items():
+        percentuale = (count / len(ordini_giornata)) * 100
+        barra = "█" * int(percentuale / 5)
+        print(f"{fascia:25} {count:2} ordini ({percentuale:5.1f}%) {barra}")
+    
+    # TODO 2.13: Confronto con storico
+    print(f"\n📈 CONFRONTO CON MEDIA SETTIMANALE:")
+    print("─"*70)
+    
+    # Media giornaliera settimana scorsa
+    vendite_giornaliere = np.sum(vendite_settimana, axis=(1, 2))
+    media_storica = np.mean(vendite_giornaliere)
+    prodotti_oggi = sum(sum(item[2] for item in ord['ordine']) for ord in ordini_giornata)
+    
+    print(f"Prodotti venduti oggi:        {prodotti_oggi}")
+    print(f"Media giornaliera storica:    {media_storica:.0f}")
+    
+    if prodotti_oggi > media_storica:
+        print(f"✅ Oggi siamo SOPRA la media di {prodotti_oggi - media_storica:.0f} prodotti!")
+    else:
+        print(f"⚠️  Oggi siamo SOTTO la media di {media_storica - prodotti_oggi:.0f} prodotti")
+    
+    # TODO 2.14: Grafico a barre ordini
+    print(f"\n📊 TREND ORDINI GIORNATA:")
+    print("─"*70)
+    
+    for i, ord in enumerate(ordini_giornata, 1):
+        barra = "█" * int(ord['totale'])
+        print(f"Ordine {i:2} €{ord['totale']:6.2f} {barra}")
+    
+    print("="*70)
 
 # ═══════════════════════════════════════════════════════════════════════
 # PARTE 3: ANALISI STATISTICHE SETTIMANA PRECEDENTE
@@ -320,10 +526,11 @@ def menu_principale():
         print("╠" + "═"*68 + "╣")
         print("║  1. 📋 Mostra Menu Prodotti".ljust(69) + "║")
         print("║  2. 🛒 Registra Nuovo Ordine".ljust(69) + "║")
-        print("║  3. 📊 Analisi Vendite Base".ljust(69) + "║")
-        print("║  4. 🔬 Analisi Avanzate".ljust(69) + "║")
-        print("║  5. 📍 Performance Filiali".ljust(69) + "║")
-        print("║  6. 🚪 Esci".ljust(69) + "║")
+        print("║  3. 📊 Resoconto Ordini di Oggi".ljust(69) + "║")
+        print("║  4. 📈 Analisi Vendite Settimana Scorsa".ljust(69) + "║")
+        print("║  5. 🔬 Analisi Avanzate Settimana Scorsa".ljust(69) + "║")
+        print("║  6. 📍 Performance Filiali".ljust(69) + "║")
+        print("║  7. 🚪 Esci".ljust(69) + "║")
         print("╚" + "═"*68 + "╝")
         
         # TODO 4.1: Implementa la gestione delle scelte del menu
@@ -335,12 +542,24 @@ def menu_principale():
             elif scelta == "2":
                 registra_ordine()
             elif scelta == "3":
-                analisi_vendite_base()
+                analisi_ordini_giornata()
             elif scelta == "4":
-                analisi_avanzata()
+                analisi_vendite_base()
             elif scelta == "5":
-                calcola_performance_filiali()
+                analisi_avanzata()
             elif scelta == "6":
+                calcola_performance_filiali()
+            elif scelta == "7":
+                # Mostra riepilogo finale prima di uscire
+                if ordini_giornata:
+                    print("\n" + "="*70)
+                    print("📊 RIEPILOGO FINALE GIORNATA")
+                    print("="*70)
+                    print(f"Ordini registrati oggi: {len(ordini_giornata)}")
+                    totale_giorno = sum(ord['totale'] for ord in ordini_giornata)
+                    print(f"Incasso totale: €{totale_giorno:.2f}")
+                    print("="*70)
+                
                 print("\n👋 Grazie per aver usato BurgerPython!")
                 print("═"*70)
                 break
@@ -364,20 +583,36 @@ if __name__ == "__main__":
 # ESERCIZI AGGIUNTIVI (OPZIONALI)
 # ═══════════════════════════════════════════════════════════════════════
 """
-TODO BONUS 1: Crea una funzione che trova i prodotti "complementari"
-              (prodotti spesso ordinati insieme) usando la correlazione
-
-TODO BONUS 2: Implementa un sistema di previsione: quanti hamburger 
-              saranno venduti domani? (usa la media mobile)
-
-TODO BONUS 3: Aggiungi un sistema di sconti:
+TODO BONUS 1: Implementa un sistema di sconti automatici:
               - 10% su ordini > €20
+              - 15% su ordini > €30
               - Menu del giorno (hamburger + patatine + bibita) a €10
 
-TODO BONUS 4: Crea un report PDF o CSV esportabile con tutte le statistiche
+TODO BONUS 2: Crea una funzione che trova i prodotti "complementari"
+              (prodotti spesso ordinati insieme) analizzando gli ordini della giornata
 
-TODO BONUS 5: Implementa un sistema di "alert": avvisa se un prodotto
-              ha vendite molto inferiori alla media (potrebbe esserci un problema)
+TODO BONUS 3: Implementa un sistema di "fidelity card":
+              - Ogni €10 spesi = 1 punto
+              - 10 punti = 1 hamburger gratis
+              - Traccia i punti per ogni cliente (chiedi nome)
+
+TODO BONUS 4: Aggiungi previsione vendite per domani:
+              - Usa la media mobile degli ultimi 3 giorni
+              - Considera il giorno della settimana (weekend vs feriali)
+
+TODO BONUS 5: Crea un sistema di "alert" che avvisa se:
+              - Un prodotto non viene ordinato per 3 giorni consecutivi
+              - Le vendite di oggi sono < 50% della media storica
+              - Un prodotto ha un picco insolito (> 200% della media)
+
+TODO BONUS 6: Esporta il resoconto giornaliero in formato CSV con:
+              - Timestamp ordine, prodotti, quantità, totale, calorie
+              - Statistiche aggregate giornaliere
+
+TODO BONUS 7: Implementa un sistema di "suggerimenti intelligenti":
+              - Basato su orario (es: "È l'ora del caffè!")
+              - Basato su meteo simulato (es: "Giornata calda, bevande fredde?")
+              - Basato su vendite precedenti del cliente
 """
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -398,4 +633,15 @@ TODO BONUS 5: Implementa un sistema di "alert": avvisa se un prodotto
 
 5. Proponi un'estensione: come gestiresti più settimane di dati per 
    analizzare trend mensili o stagionali?
+
+6. Perché è importante confrontare gli ordini manuali con i dati storici?
+   Quali decisioni aziendali potrebbero beneficiare di questa analisi?
+
+7. Come potresti usare i dati degli ordini giornalieri per ottimizzare:
+   - La gestione del personale (quanti dipendenti servono?)
+   - L'inventario (quante materie prime ordinare?)
+   - Il menu (quali prodotti promuovere o rimuovere?)
+
+8. Cosa succederebbe se dovessi gestire migliaia di ordini al giorno?
+   Quali problemi di performance potresti incontrare con l'approccio attuale?
 """
