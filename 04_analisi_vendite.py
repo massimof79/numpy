@@ -1034,7 +1034,7 @@ def main():
     # -------------------------------------------------------------------------
     
     print("\n" + "="*60)
-    print("🎓 COMPITO DI REALTÀ: Analisi Vendite con NumPy")
+    print("Analisi Vendite con NumPy")
     print("="*60)
     print("Benvenuto nel sistema di analisi vendite!")
     print("Imparerai a usare array NumPy per analizzare dati reali.")
