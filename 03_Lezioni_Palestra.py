@@ -102,6 +102,8 @@ def calcola_statistiche(partecipazioni):
       - fatturato_per_sede (array 7x4)
       - lezione_piu_seguita, lezione_meno_seguita, qty_piu, qty_meno
     """
+
+    #collassa gli assi dei giorni e delle sedi, resta solo la dimensione delle lezioni
     totale_per_lezione = partecipazioni.sum(axis=(0,1))
     idx_max = int(np.argmax(totale_per_lezione))
     idx_min = int(np.argmin(totale_per_lezione))
@@ -110,8 +112,15 @@ def calcola_statistiche(partecipazioni):
     qty_piu = int(totale_per_lezione[idx_max])
     qty_meno = int(totale_per_lezione[idx_min])
 
-    accessi_giornalieri = np.array([partecipazioni[g].sum() for g in range(partecipazioni.shape[0])])
 
+    ##Cicla un numero di volte parli alla lunghezza della dimensione 0
+    for g in range(partecipazioni.shape[0]):
+        somma_giorno = partecipazioni[g].sum()   # somma dei valori del giorno g
+        accessi_giornalieri.append(somma_giorno)
+
+    #converto la lista in un array numpy
+    accessi_giornalieri = np.array(accessi_giornalieri)
+    
     fatturato_per_sede = np.zeros((partecipazioni.shape[0], partecipazioni.shape[1]))
     for g in range(partecipazioni.shape[0]):
         fatturato_per_sede[g] = (partecipazioni[g] * prices).sum(axis=1)
@@ -125,6 +134,25 @@ def calcola_statistiche(partecipazioni):
         "qty_piu": qty_piu,
         "qty_meno": qty_meno
     }
+
+
+""" 2. partecipazioni.shape[0]
+shape restituisce una tupla con le dimensioni dell’array.
+partecipazioni.shape[0] → numero di righe → numero di giorni.
+
+3. for g in range(partecipazioni.shape[0])
+Cicla su tutti gli indici di riga (cioè su ogni giorno).
+
+4. partecipazioni[g].sum()
+partecipazioni[g] estrae la riga g (un array 1D contenente i valori di quel giorno).
+.sum() calcola la somma dei valori di quella riga (cioè il totale dei partecipanti in quel giorno).
+
+5. [partecipazioni[g].sum() for g in range(...)]
+Crea una lista che contiene la somma giornaliera per ogni riga.
+ """
+
+
+
 
 # --------------------------
 # Output testuale
