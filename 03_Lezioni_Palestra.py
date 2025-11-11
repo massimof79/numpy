@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """
-GymAnalytics - versione con grafici
-Genera:
-  1) Accessi giornalieri (line plot)
-  2) Fatturato giornaliero per sede (bar raggruppate)
-  3) Partecipanti totali per lezione (bar chart)
+GymAnalytics - versione semplificata (senza grafici)
+Genera riepiloghi testuali:
+  - lezione più / meno seguita
+  - partecipanti totali per lezione (settimana)
+  - accessi giornalieri e media
+  - fatturato giornaliero per sede (tabellare)
 
-Salva come: gymanalytics_grafici.py
-Esecuzione: python3 gymanalytics_grafici.py
-Requisiti: numpy, matplotlib
+Requisiti: numpy
+Esecuzione: python3 gymanalytics_simplificato.py
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 # --------------------------
 # Configurazione dati
 # --------------------------
 LEZIONI = {
-    1: ["Yoga", 8.00, 50, 1],         # nome, prezzo €, calorie stimate/sessione, durata ore
+    1: ["Yoga", 8.00, 50, 1],
     2: ["Pilates", 9.00, 60, 1],
     3: ["CrossFit", 12.00, 200, 1],
     4: ["HIIT", 11.00, 220, 1],
@@ -33,7 +32,6 @@ LEZIONI = {
 SEDI = ["Centro", "Nord", "Sud", "Est"]
 GIORNI = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
 
-# vettore prezzi (indice 0 -> lezione 1)
 prices = np.array([LEZIONI[i+1][1] for i in range(len(LEZIONI))])
 
 # --------------------------
@@ -129,68 +127,41 @@ def calcola_statistiche(partecipazioni):
     }
 
 # --------------------------
-# Funzioni di plotting
+# Output testuale
 # --------------------------
-def plot_accessi_giornalieri(accessi_giornalieri):
-    plt.figure()
-    plt.plot(GIORNI, accessi_giornalieri, marker='o')
-    plt.title("Accessi giornalieri totali")
-    plt.xlabel("Giorno")
-    plt.ylabel("Numero accessi")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+def stampa_riassunto(stats):
+    print("GymAnalytics - Riepilogo settimanale\n")
+    print(f"Lezione più seguita: {stats['lezione_piu']} (partecipanti: {stats['qty_piu']})")
+    print(f"Lezione meno seguita: {stats['lezione_meno']} (partecipanti: {stats['qty_meno']})\n")
 
-def plot_fatturato_per_sede(fatturato_per_sede):
-    x = np.arange(len(GIORNI))
-    larghezza = 0.18
-    plt.figure()
-    for i in range(len(SEDI)):
-        plt.bar(x + (i - 1.5) * larghezza, fatturato_per_sede[:, i], width=larghezza, label=SEDI[i])
-    plt.xticks(x, GIORNI)
-    plt.title("Fatturato giornaliero per sede")
-    plt.xlabel("Giorno")
-    plt.ylabel("Ricavo (€)")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-def plot_partecipanti_per_lezione(totale_per_lezione):
+    print("Partecipanti totali per lezione (settimana):")
     lezioni_nomi = [LEZIONI[i+1][0] for i in range(len(LEZIONI))]
-    indices = np.arange(len(lezioni_nomi))
-    plt.figure(figsize=(10, 5))
-    plt.bar(indices, totale_per_lezione)
-    plt.xticks(indices, lezioni_nomi, rotation=45, ha='right')
-    plt.title("Partecipanti per lezione (settimana)")
-    plt.xlabel("Lezione")
-    plt.ylabel("Partecipanti")
-    plt.tight_layout()
-    plt.show()
+    for nome, tot in zip(lezioni_nomi, stats['totale_per_lezione']):
+        print(f"  {nome}: {int(tot)}")
+
+    print("\nAccessi giornalieri:")
+    for i, g in enumerate(GIORNI):
+        print(f"  {g}: {int(stats['accessi_giornalieri'][i])} accessi")
+    print(f"Accessi medi giornalieri: {stats['accessi_giornalieri'].mean():.2f}\n")
+
+    print("Fatturato giornaliero per sede (tabella: righe=giorni, colonne=sedi):")
+    header = "Giorno".ljust(12) + "".join(s.ljust(10) for s in SEDI)
+    print(header)
+    for i, g in enumerate(GIORNI):
+        row = g.ljust(12) + "".join(f"{stats['fatturato_per_sede'][i, j]:<10.2f}" for j in range(len(SEDI)))
+        print(row)
 
 # --------------------------
 # Main
 # --------------------------
 def main():
     stats = calcola_statistiche(partecipazioni_settimana)
+    stampa_riassunto(stats)
 
-    # Stampa riassuntiva su console
-    print("Analisi partecipazioni - GymAnalytics (con grafici)\n")
-    print(f"Lezione più seguita: {stats['lezione_piu']} (partecipanti: {stats['qty_piu']})")
-    print(f"Lezione meno seguita: {stats['lezione_meno']} (partecipanti: {stats['qty_meno']})")
-    print("\nAccessi giornalieri:")
-    for i, g in enumerate(GIORNI):
-        print(f"  {g}: {int(stats['accessi_giornalieri'][i])} accessi")
-    print(f"\nAccessi medi giornalieri: {stats['accessi_giornalieri'].mean():.2f}\n")
-
-    # Mostra grafici
-    plot_accessi_giornalieri(stats['accessi_giornalieri'])
-    plot_fatturato_per_sede(stats['fatturato_per_sede'])
-    plot_partecipanti_per_lezione(stats['totale_per_lezione'])
-
-    # Esempio: registrare una prenotazione (facoltativo)
+    # Esempio d'uso della funzione add_booking (commentata)
     # partecipazioni_mod = add_booking(partecipazioni_settimana, giorno=2, sede=1, lesson_id=3, quantita=2)
     # stats2 = calcola_statistiche(partecipazioni_mod)
-    # plot_accessi_giornalieri(stats2['accessi_giornalieri'])
+    # stampa_riassunto(stats2)
 
 if __name__ == "__main__":
     main()
